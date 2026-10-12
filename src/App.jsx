@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Activity,
   ArrowRight,
@@ -31,10 +31,8 @@ import {
   SiSpring,
   SiTypescript,
 } from 'react-icons/si'
-import assessmentPortalImage from './assets/EAP.png'
-import endavaTalentSphereImage from './assets/ETS.png'
-import healthSyncImage from './assets/HealthSync.png'
 import resumeUrl from './assets/Shruti_Sunil_Girhe_Resume.pdf'
+import introVideoUrl from './assets/video.mp4'
 import './App.css'
 
 const greeting = "Hi, I'm Shruti"
@@ -77,7 +75,6 @@ const technologyIcons = {
 const projects = [
   {
     title: 'HealthSync',
-    image: healthSyncImage,
     subtitle: 'Full Stack Healthcare & Insurance Application',
     description: [
       'A full-stack healthcare and insurance platform designed to streamline patient, hospital, doctor, and insurance workflows.',
@@ -89,7 +86,6 @@ const projects = [
   },
   {
     title: 'Assessment Portal',
-    image: assessmentPortalImage,
     subtitle: 'Enterprise Assessment Platform',
     description: [
       'An enterprise assessment platform for internal employees and external candidates.',
@@ -105,7 +101,6 @@ const projects = [
   },
   {
     title: 'Endava Talent Sphere',
-    image: endavaTalentSphereImage,
     subtitle: 'Employee Appraisal Management',
     description: [
       'A microservices-based employee appraisal platform for organizational cycles and hierarchical reviews.',
@@ -118,8 +113,10 @@ const projects = [
 
 function App() {
   const [activeSkillCategory, setActiveSkillCategory] = useState(null)
+  const introVideoRef = useRef(null)
   const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const [activeProjectIndex, setActiveProjectIndex] = useState(0)
+  const [isProjectTrackResetting, setIsProjectTrackResetting] = useState(false)
   const [projectsPaused, setProjectsPaused] = useState(false)
   const [typedCharacterCount, setTypedCharacterCount] = useState(() =>
     window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -146,6 +143,32 @@ function App() {
   }, [])
 
   useEffect(() => {
+    const video = introVideoRef.current
+
+    if (!video || prefersReducedMotion) {
+      return undefined
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          video.currentTime = 0
+          video.play().catch(() => {})
+        } else {
+          video.pause()
+        }
+      },
+      { threshold: 0.4 },
+    )
+
+    observer.observe(video)
+    return () => {
+      observer.disconnect()
+      video.pause()
+    }
+  }, [prefersReducedMotion])
+
+  useEffect(() => {
     if (
       projectsPaused ||
       prefersReducedMotion
@@ -154,11 +177,31 @@ function App() {
     }
 
     const carouselTimer = window.setInterval(() => {
-      setActiveProjectIndex((index) => (index + 1) % projects.length)
+      setActiveProjectIndex((index) => Math.min(index + 1, projects.length))
     }, 5000)
 
     return () => window.clearInterval(carouselTimer)
   }, [prefersReducedMotion, projectsPaused])
+
+  const carouselProjects = prefersReducedMotion
+    ? projects
+    : [...projects, projects[0]]
+
+  function handleProjectTrackTransitionEnd(event) {
+    if (
+      event.target !== event.currentTarget ||
+      event.propertyName !== 'transform' ||
+      activeProjectIndex !== projects.length
+    ) {
+      return
+    }
+
+    setIsProjectTrackResetting(true)
+    setActiveProjectIndex(0)
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => setIsProjectTrackResetting(false))
+    })
+  }
 
   const typedGreeting = typewriterCharacters
     .slice(0, Math.min(typedCharacterCount, greetingCharacterCount))
@@ -166,9 +209,6 @@ function App() {
   const typedRole = typewriterCharacters
     .slice(roleStartIndex, typedCharacterCount)
     .join('')
-  const displayedProjects = prefersReducedMotion
-    ? projects
-    : [projects[activeProjectIndex]]
 
   return (
     <>
@@ -199,42 +239,52 @@ function App() {
       </header>
 
       <main className="intro">
-        <h1 aria-label={`${greeting}. ${role}`}>
-          <span className="intro-greeting" aria-hidden="true">
-            <span
-              className={`greeting-text${typedCharacterCount < greetingCharacterCount ? ' typing-cursor' : ''}`}
-            >
-              {typedGreeting}
+        <div className="intro-layout">
+          <h1 aria-label={`${greeting}. ${role}`}>
+            <span className="intro-greeting" aria-hidden="true">
+              <span
+                className={`greeting-text${typedCharacterCount < greetingCharacterCount ? ' typing-cursor' : ''}`}
+              >
+                {typedGreeting}
+              </span>
             </span>
-            {typedCharacterCount > greetingCharacterCount && (
-              <span className="wave-icon">👋</span>
-            )}
-          </span>
-          <span
-            className={`intro-role${typedCharacterCount >= roleStartIndex ? ' typing-cursor' : ''}`}
-            aria-hidden="true"
-          >
-            {typedRole}
-          </span>
-        </h1>
-        <p>
-          I build full-stack applications, solve real-world problems, and turn
-          ideas into working products.
-        </p>
-        <div className="intro-actions">
-          <a
-            className="resume-button"
-            href={resumeUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <FileText aria-hidden="true" size={18} strokeWidth={1.75} />
-            Resume
-          </a>
-          <a className="project-button" href="#project">
-            <FolderKanban aria-hidden="true" size={18} strokeWidth={1.75} />
-            Project
-          </a>
+            <span
+              className={`intro-role${typedCharacterCount >= roleStartIndex ? ' typing-cursor' : ''}`}
+              aria-hidden="true"
+            >
+              {typedRole}
+            </span>
+          </h1>
+          <div className="intro-video-frame">
+            <video
+              ref={introVideoRef}
+              src={introVideoUrl}
+              className="intro-video"
+              muted
+              playsInline
+              preload="metadata"
+              aria-label="Shruti introducing herself"
+            />
+          </div>
+          <p className="intro-description">
+            I build full-stack applications, solve real-world problems, and turn
+            ideas into working products.
+          </p>
+          <div className="intro-actions">
+            <a
+              className="resume-button"
+              href={resumeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <FileText aria-hidden="true" size={18} strokeWidth={1.75} />
+              Resume
+            </a>
+            <a className="project-button" href="#project">
+              <FolderKanban aria-hidden="true" size={18} strokeWidth={1.75} />
+              Project
+            </a>
+          </div>
         </div>
       </main>
 
@@ -324,51 +374,52 @@ function App() {
             }
           }}
         >
-          {displayedProjects.map((project) => (
-            <article
-              className="project-card"
-              key={prefersReducedMotion ? project.title : 'active-project'}
-            >
-              <div className="project-card-content" key={project.title}>
-                <div className="project-copy">
-                  <h3>{project.title}</h3>
-                  <p className="project-subtitle">{project.subtitle}</p>
-                  <ul className="project-description">
-                    {project.description.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                  {project.techStack && (
-                    <p className="project-detail">
-                      <strong>Tech Stack:</strong> {project.techStack}
-                    </p>
-                  )}
-                  {project.features && (
-                    <div className="project-detail">
-                      <strong>Key Features:</strong>
-                      <ul className="project-features">
-                        {project.features.map((feature) => (
-                          <li key={feature}>{feature}</li>
+          <div
+            className={`project-track${isProjectTrackResetting ? ' is-resetting' : ''}`}
+            style={{ transform: `translateX(-${activeProjectIndex * 100}%)` }}
+            onTransitionEnd={handleProjectTrackTransitionEnd}
+          >
+            {carouselProjects.map((project, index) => (
+              <div className="project-slide" key={`${project.title}-${index}`}>
+                <article
+                  className="project-card"
+                  aria-hidden={!prefersReducedMotion && index !== activeProjectIndex}
+                >
+                  <div className="project-card-content">
+                    <div className="project-copy">
+                      <h3>{project.title}</h3>
+                      <p className="project-subtitle">{project.subtitle}</p>
+                      <ul className="project-description">
+                        {project.description.map((item) => (
+                          <li key={item}>{item}</li>
                         ))}
                       </ul>
+                      {project.techStack && (
+                        <p className="project-detail">
+                          <strong>Tech Stack:</strong> {project.techStack}
+                        </p>
+                      )}
+                      {project.features && (
+                        <div className="project-detail">
+                          <strong>Key Features:</strong>
+                          <ul className="project-features">
+                            {project.features.map((feature) => (
+                              <li key={feature}>{feature}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {project.highlight && (
+                        <p className="project-detail project-highlight">
+                          <strong>Highlight:</strong> {project.highlight}
+                        </p>
+                      )}
                     </div>
-                  )}
-                  {project.highlight && (
-                    <p className="project-detail project-highlight">
-                      <strong>Highlight:</strong> {project.highlight}
-                    </p>
-                  )}
-                </div>
-                <div className="project-image-frame">
-                  <img
-                    className="project-image"
-                    src={project.image}
-                    alt={`${project.title} project preview`}
-                  />
-                </div>
+                  </div>
+                </article>
               </div>
-              </article>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
@@ -464,6 +515,30 @@ function App() {
       </section>
 
       <footer className="site-footer">
+        <svg
+          className="site-footer-wave"
+          viewBox="0 0 1440 220"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <defs>
+            <linearGradient id="footer-wave-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="var(--common-gradient-start)" />
+              <stop offset="100%" stopColor="var(--common-gradient-end)" />
+            </linearGradient>
+          </defs>
+          <path
+            className="site-footer-wave-desktop"
+            d="M0 58 C120 18 240 18 360 58 C480 98 600 98 720 58 C840 18 960 18 1080 58 C1200 98 1320 98 1440 58 L1440 220 L0 220 Z"
+            fill="url(#footer-wave-gradient)"
+          />
+          <path
+            className="site-footer-wave-mobile"
+            d="M0 58 C180 18 300 18 480 58 C660 98 780 98 960 58 C1140 18 1260 18 1440 58 L1440 220 L0 220 Z"
+            fill="url(#footer-wave-gradient)"
+          />
+        </svg>
         <p>Designed by <strong>Shruti Girhe</strong></p>
         <p>Built with React, Vite, CSS, Lucide React, and React Icons.</p>
       </footer>
